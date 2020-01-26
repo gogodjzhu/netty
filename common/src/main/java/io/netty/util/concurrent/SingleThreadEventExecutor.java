@@ -596,8 +596,8 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         gracefulShutdownQuietPeriod = unit.toNanos(quietPeriod);
         gracefulShutdownTimeout = unit.toNanos(timeout);
 
-        if (oldState == ST_NOT_STARTED) {
-            doStartThread();
+        if (oldState == ST_NOT_STARTED) { // 只有在旧状态为NOT_STARTED时(此时正常启动程序尚未启动worker线程), 启动worker线程以使后续可以处理关闭事件
+            doStartThread(); // shutdownGracefully
         }
 
         if (wakeup) {
@@ -649,7 +649,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
 
         if (oldState == ST_NOT_STARTED) {
-            doStartThread();
+            doStartThread(); // shutdown
         }
 
         if (wakeup) {
@@ -687,6 +687,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         cancelScheduledTasks();
 
         if (gracefulShutdownStartTime == 0) {
+            // 记录当前(优雅关闭时的)时间戳, 即系统启动到今的相对时间
             gracefulShutdownStartTime = ScheduledFutureTask.nanoTime();
         }
 
@@ -852,11 +853,14 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     private void startThread() {
         if (STATE_UPDATER.get(this) == ST_NOT_STARTED) {
             if (STATE_UPDATER.compareAndSet(this, ST_NOT_STARTED, ST_STARTED)) {
-                doStartThread();
+                doStartThread(); // startThread
             }
         }
     }
 
+    /**
+     * 尝试在当前实例的线程池中启动一个Runnable,
+     */
     private void doStartThread() {
         assert thread == null;
         executor.execute(new Runnable() {
@@ -870,6 +874,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
                 boolean success = false;
                 updateLastExecutionTime();
                 try {
+                    /** 对于{@link io.netty.channel.nio.NioEventLoop}run方法会循环遍历Selector的注册事件, 直到判断此worker线程已经退出, 才退出死循环 */
                     SingleThreadEventExecutor.this.run();
                     success = true;
                 } catch (Throwable t) {

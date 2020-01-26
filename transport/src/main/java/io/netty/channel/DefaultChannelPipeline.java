@@ -89,6 +89,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         succeededFuture = new SucceededChannelFuture(channel, null);
         voidPromise =  new VoidChannelPromise(channel, true);
 
+        // 指定初始头尾指针
         tail = new TailContext(this);
         head = new HeadContext(this);
 
@@ -103,6 +104,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         return estimatorHandle;
     }
 
+    /**
+     * 必要时做内存泄露监测
+     */
     final Object touch(Object msg, AbstractChannelHandlerContext next) {
         return touch ? ReferenceCountUtil.touch(msg, next) : msg;
     }
@@ -169,16 +173,19 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                 executor.execute(new Runnable() {
                     @Override
                     public void run() {
+                        // 在EventLoop线程上调用"添加Context入pipeline事件"的回调方法
                         callHandlerAdded0(newCtx);
                     }
                 });
                 return this;
             }
         }
+        // 在EventLoop线程(即当前线程)上调用"添加Context入pipeline事件"的回调方法, 此时不加锁
         callHandlerAdded0(newCtx);
         return this;
     }
 
+    // 将newCtx放到仅次于head.next
     private void addFirst0(AbstractChannelHandlerContext newCtx) {
         AbstractChannelHandlerContext nextCtx = head.next;
         newCtx.prev = head;
@@ -594,6 +601,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     private void callHandlerAdded0(final AbstractChannelHandlerContext ctx) {
         try {
+            // 回调Context绑定的Handler的相应回调方法
             ctx.handler().handlerAdded(ctx);
             ctx.setAddComplete();
         } catch (Throwable t) {
@@ -817,6 +825,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     @Override
     public final ChannelPipeline fireChannelRegistered() {
+        // 触发的事件按照handler规则在pipeline传播
         AbstractChannelHandlerContext.invokeChannelRegistered(head);
         return this;
     }
@@ -1171,6 +1180,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     // A special catch-all handler that handles both bytes and messages.
+    /**
+     * 和{@link HeadContext} 一起是两个默认添加到{@link DefaultChannelPipeline#DefaultChannelPipeline(Channel)}的Context
+     */
     final class TailContext extends AbstractChannelHandlerContext implements ChannelInboundHandler {
 
         TailContext(DefaultChannelPipeline pipeline) {
@@ -1225,6 +1237,9 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         public void channelReadComplete(ChannelHandlerContext ctx) throws Exception { }
     }
 
+    /**
+     * 和{@link TailContext} 一起是两个默认添加到{@link DefaultChannelPipeline#DefaultChannelPipeline(Channel)}的Context
+     */
     final class HeadContext extends AbstractChannelHandlerContext
             implements ChannelOutboundHandler, ChannelInboundHandler {
 

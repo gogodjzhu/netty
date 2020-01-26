@@ -213,6 +213,11 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         return new Entry[size];
     }
 
+    /**
+     * ServerSocketChannel在完成连接之后生成的SocketChannel对象被封装成NioSocketChannel添加到Pipeline中，同时在此Pipeline中会添
+     * 加此InboundHandler用于处理SocketChannel的初始化配置，并将此SocketChannel注册到WorkerGroup(即childGroup)中。至此完成了连接
+     * 从BossGroup到WorkerGroup的转移
+     */
     private static class ServerBootstrapAcceptor extends ChannelInboundHandlerAdapter {
 
         private final EventLoopGroup childGroup;
@@ -232,6 +237,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
         @Override
         @SuppressWarnings("unchecked")
         public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            // 对于新建连接, 此channel为NioSocketChannel(netty对java SocketChannel的封装)
             final Channel child = (Channel) msg;
 
             child.pipeline().addLast(childHandler);
@@ -251,6 +257,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
             }
 
             try {
+                // 将此SocketChannel注册到childGroup(workerGroup)
                 childGroup.register(child).addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture future) throws Exception {

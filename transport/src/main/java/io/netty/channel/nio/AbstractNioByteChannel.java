@@ -114,8 +114,11 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
             boolean close = false;
             try {
                 do {
+                    /** {@link io.netty.channel.AdaptiveRecvByteBufAllocator} */
                     byteBuf = allocHandle.allocate(allocator);
+                    // 执行消费
                     allocHandle.lastBytesRead(doReadBytes(byteBuf));
+                    // 无新消息, 释放buffer
                     if (allocHandle.lastBytesRead() <= 0) {
                         // nothing was read. release the buffer.
                         byteBuf.release();
@@ -124,16 +127,21 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                         break;
                     }
 
+                    // 增加读入消息数量
                     allocHandle.incMessagesRead(1);
                     readPending = false;
+                    // 触发pipeline 消费消息 事件
                     pipeline.fireChannelRead(byteBuf);
                     byteBuf = null;
                 } while (allocHandle.continueReading());
 
+                // 读取结束后动作, 对于自适应的Allocator会根据此次读取的字节数调整
                 allocHandle.readComplete();
+                // 触发pipeline 读取消息完成 事件
                 pipeline.fireChannelReadComplete();
 
                 if (close) {
+                    // 关闭pipeline
                     closeOnRead(pipeline);
                 }
             } catch (Throwable t) {
@@ -152,12 +160,16 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         }
     }
 
+    /**
+     * 将指定buffer的消息通过当前channel发送出去
+     */
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
         int writeSpinCount = -1;
 
         boolean setOpWrite = false;
         for (;;) {
+            // buffer的发送(flushed)链表的表头内容, 通过外层for循环遍历链表
             Object msg = in.current();
             if (msg == null) {
                 // Wrote all messages.
@@ -177,25 +189,36 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 boolean done = false;
                 long flushedAmount = 0;
                 if (writeSpinCount == -1) {
+                    // 默认值为16
                     writeSpinCount = config().getWriteSpinCount();
                 }
+                /** writeSpinCount 配置控制针对单个buffer写出数据的最大次数, 超过此次数未发送完毕的buffer会暂时停止, 保证均衡发送*/
                 for (int i = writeSpinCount - 1; i >= 0; i --) {
+                    // 执行发送, 返回值为实际发送的字节数
                     int localFlushedAmount = doWriteBytes(buf);
+                    // 正常情况下doWriteBytes(buf)方法应该将buf内的数据发送出去, 则返回的值应该大于0. 如果返回值为0表示数据为写出,
+                    // 将setOpWrite置为true, 后续会注册OP_WRITE事件等待再次写入
                     if (localFlushedAmount == 0) {
-                        setOpWrite = true;
+                        setOpWrite = true; // return0, 表示buf内的已有可读数据已经全部通过channel发送完毕
                         break;
                     }
 
+                    // TODO 为什么要分两步判断消费结束? done变量为什么不能直接通过localFlushedAmount==0来判断? 换句话说,
+                    //  doWriteBytes返回0 跟 buf.isReadable()返回false有什么区别?
                     flushedAmount += localFlushedAmount;
+                    // 根据buffer的writeIndex/readIndex来判断此buffer的消费进度
                     if (!buf.isReadable()) {
+                        // 此buffer(Entry)已经发送完毕, 标记之
                         done = true;
                         break;
                     }
                 }
 
+                // 修改buffer对应Future Promise的发送进度
                 in.progress(flushedAmount);
 
                 if (done) {
+                    // 将此buffer(Entry)从整个发送缓存链表中移除
                     in.remove();
                 } else {
                     // Break the loop and so incompleteWrite(...) is called.
@@ -239,6 +262,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 throw new Error();
             }
         }
+        //
         incompleteWrite(setOpWrite);
     }
 
@@ -261,6 +285,10 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 "unsupported message type: " + StringUtil.simpleClassName(msg) + EXPECTED_TYPES);
     }
 
+    /**
+     * 处理 未完成/已完成 后工作,
+     * @param setOpWrite true=未完成发送
+     */
     protected final void incompleteWrite(boolean setOpWrite) {
         // Did not write completely.
         if (setOpWrite) {

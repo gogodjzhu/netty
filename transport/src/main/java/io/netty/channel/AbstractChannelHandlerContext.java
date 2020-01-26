@@ -139,6 +139,10 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         return this;
     }
 
+    /**
+     * 触发指定Context上的{@link this#invokeChannelRegistered()}方法
+     * @param next
+     */
     static void invokeChannelRegistered(final AbstractChannelHandlerContext next) {
         EventExecutor executor = next.executor();
         if (executor.inEventLoop()) {
@@ -153,14 +157,20 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         }
     }
 
+    /**
+     */
     private void invokeChannelRegistered() {
         if (invokeHandler()) {
             try {
+                /**
+                 * 回调当前context绑定的Handler上的{@link ChannelInboundHandler#channelRegistered(ChannelHandlerContext)}方法
+                 */
                 ((ChannelInboundHandler) handler()).channelRegistered(this);
             } catch (Throwable t) {
                 notifyHandlerException(t);
             }
         } else {
+            // 触发从当前Context开始的事件传播
             fireChannelRegistered();
         }
     }
@@ -367,6 +377,9 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         }
     }
 
+    /**
+     * 回调当前context绑定handler的channelRead()方法
+     */
     private void invokeChannelRead(Object msg) {
         if (invokeHandler()) {
             try {
@@ -612,7 +625,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
             // cancelled
             return promise;
         }
-
+        // 以当前context为锚点, 找prev节点
         final AbstractChannelHandlerContext next = findContextOutbound();
         EventExecutor executor = next.executor();
         if (executor.inEventLoop()) {
@@ -632,6 +645,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
     private void invokeClose(ChannelPromise promise) {
         if (invokeHandler()) {
             try {
+                /** {@link #handler()}方法返回当前context绑定的handler */
                 ((ChannelOutboundHandler) handler()).close(this, promise);
             } catch (Throwable t) {
                 notifyOutboundHandlerException(t, promise);
@@ -942,19 +956,25 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         return true;
     }
 
+    /**
+     * 获取Context上绑定的入站Handler，如果当前Context绑定的不是Inbound类型，沿着Context(即沿着Pipeline)向下寻找
+     */
     private AbstractChannelHandlerContext findContextInbound() {
-        AbstractChannelHandlerContext ctx = this;
+        AbstractChannelHandlerContext ctx = this; // 从当前context开始遍历
         do {
             ctx = ctx.next;
-        } while (!ctx.inbound);
+        } while (!ctx.inbound); // 跳过所有非Inbound的handler
         return ctx;
     }
 
+    /**
+     * 获取Context上绑定的入站Handler，如果当前Context绑定的不是Outbound类型，沿着Context(即沿着Pipeline)向上寻找
+     */
     private AbstractChannelHandlerContext findContextOutbound() {
-        AbstractChannelHandlerContext ctx = this;
+        AbstractChannelHandlerContext ctx = this; // 从当前context开始遍历
         do {
             ctx = ctx.prev;
-        } while (!ctx.outbound);
+        } while (!ctx.outbound); // 跳过所有非Outbound的handler
         return ctx;
     }
 

@@ -283,6 +283,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
         }
 
         try {
+            logger.info("NioEventLoop register:" + interestOps);
             ch.register(selector, interestOps, task);
         } catch (Exception e) {
             throw new EventLoopException("failed to register a channel", e);
@@ -442,7 +443,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                         processSelectedKeys();
                     } finally {
                         // Ensure we always run tasks.
-                        runAllTasks();
+                        runAllTasks(); // 在这个run方法中还会处理用户自定义的Task和定时任务Task.
                     }
                 } else {
                     final long ioStartTime = System.nanoTime();
@@ -459,6 +460,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             }
             // Always handle shutdown even if the loop processing threw an exception.
             try {
+                // 判断正在结束此workerThread, 跳出循环
                 if (isShuttingDown()) {
                     closeAll();
                     if (confirmShutdown()) {
@@ -640,6 +642,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
             }
 
             // Process OP_WRITE first as we may be able to write some queued buffers and so free memory.
+            // 写入事件
             if ((readyOps & SelectionKey.OP_WRITE) != 0) {
                 // Call forceFlush which will also take care of clear the OP_WRITE once there is nothing left to write
                 ch.unsafe().forceFlush();
@@ -647,6 +650,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
             // Also check for readOps of 0 to workaround possible JDK bug which may otherwise lead
             // to a spin loop
+            // 可读事件 or 网络连接 (断开连接也在这里进入)
             if ((readyOps & (SelectionKey.OP_READ | SelectionKey.OP_ACCEPT)) != 0 || readyOps == 0) {
                 unsafe.read();
                 if (!ch.isOpen()) {

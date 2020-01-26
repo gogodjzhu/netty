@@ -43,10 +43,17 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
                              implements io.netty.channel.socket.ServerSocketChannel {
 
     private static final ChannelMetadata METADATA = new ChannelMetadata(false, 16);
+    // 无参构造器默认使用此SelectorProvider, 底层调用sun.nio.ch.DefaultSelectorProvider构造, 后者跟JDK平台有关.
+    // macos: KQueueSelectorProvider
+    // linux: EPollSelectorProvider
+    // 实际上大多数的系统都支持PollSelectorProvider, 但都未选用
     private static final SelectorProvider DEFAULT_SELECTOR_PROVIDER = SelectorProvider.provider();
 
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioServerSocketChannel.class);
 
+    /**
+     * 依赖SelectorProvider创建ServerSocketChannel
+     */
     private static ServerSocketChannel newSocket(SelectorProvider provider) {
         try {
             /**
@@ -137,6 +144,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
 
     @Override
     protected int doReadMessages(List<Object> buf) throws Exception {
+        // 接受新连接创建SocketChannel, 如果没有新连接, 返回null
         SocketChannel ch = javaChannel().accept();
 
         try {
@@ -153,7 +161,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
                 logger.warn("Failed to close a socket.", t2);
             }
         }
-
+        // 无新连接
         return 0;
     }
 

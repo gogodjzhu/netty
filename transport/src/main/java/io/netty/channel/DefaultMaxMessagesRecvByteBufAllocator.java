@@ -94,6 +94,14 @@ public abstract class DefaultMaxMessagesRecvByteBufAllocator implements MaxMessa
             return lastBytesRead;
         }
 
+        /**
+         * 判断一个channel是否应该继续读取数据，满足以下所有条件才继续:
+         * 1. config.isAutoRead() = true
+         * 2. attemptedBytesRead == lastBytesRead, 即未读取到目标大小的消息, 即消息未填满
+         * 3. totalMessages < maxMessagePerRead, 读取消息的次数未超过最大值
+         * 4. totalBytesRead < Integer.MAX_VALUE, 读取的消息字节数大小未超最大值
+         * @return
+         */
         @Override
         public boolean continueReading() {
             return config.isAutoRead() &&

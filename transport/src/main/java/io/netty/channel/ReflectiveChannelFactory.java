@@ -35,6 +35,10 @@ public class ReflectiveChannelFactory<T extends Channel> implements ChannelFacto
     @Override
     public T newChannel() {
         try {
+            /** 反射工厂最终还是调用类的无参构造器, 你可以关注以下几个Channel类:
+             * {@link io.netty.channel.socket.nio.NioServerSocketChannel}
+             * {@link io.netty.channel.socket.nio.NioSocketChannel}
+             */
             return clazz.newInstance();
         } catch (Throwable t) {
             throw new ChannelException("Unable to create Channel from class " + clazz, t);

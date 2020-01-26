@@ -418,6 +418,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
      */
     protected abstract class AbstractUnsafe implements Unsafe {
 
+        /** 发送端缓存 */
         private volatile ChannelOutboundBuffer outboundBuffer = new ChannelOutboundBuffer(AbstractChannel.this);
         private RecvByteBufAllocator.Handle recvHandle;
         private boolean inFlush0;
@@ -489,6 +490,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
         }
 
+        /**
+         * 将当前channel注册到{@link EventLoop}中(本质是将Channel注册到Selector中,但为监听任何事件), 结果写入promise以实现跨线程通知
+         * @param promise
+         */
         private void register0(ChannelPromise promise) {
             try {
                 // check if the channel is still open as it could be closed in the mean time when the register
@@ -497,7 +502,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     return;
                 }
                 boolean firstRegistration = neverRegistered;
-                doRegister();
+                doRegister(); // 在AbstractNioChannel的实现中, 将channel注册到selector上, 但实际未监听任意事件
                 neverRegistered = false;
                 registered = true;
 
@@ -505,12 +510,14 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 // user may already fire events through the pipeline in the ChannelFutureListener.
                 pipeline.invokeHandlerAddedIfNeeded();
 
-                safeSetSuccess(promise);
+                safeSetSuccess(promise); // 更新promise状态为SUCCESS
+                // 在pipeline上触发一个ChannelRegistered事件
                 pipeline.fireChannelRegistered();
                 // Only fire a channelActive if the channel has never been registered. This prevents firing
                 // multiple channel actives if the channel is deregistered and re-registered.
-                if (isActive()) {
+                if (isActive()) { // 判断channel是否已经完成连接
                     if (firstRegistration) {
+                        // 首次连接, 以ChannelActive事件从head开始触发Pipeline
                         pipeline.fireChannelActive();
                     } else if (config().isAutoRead()) {
                         // This channel was registered before and autoRead() is set. This means we need to begin read
@@ -551,7 +558,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             boolean wasActive = isActive();
             try {
-                doBind(localAddress);
+                doBind(localAddress); // 将当前channel绑定到指定的地址上, 针对不同的Channel类型doBind的实际动作各有差异
             } catch (Throwable t) {
                 safeSetFailure(promise, t);
                 closeIfClosed();
@@ -562,6 +569,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 invokeLater(new Runnable() {
                     @Override
                     public void run() {
+                        //
                         pipeline.fireChannelActive();
                     }
                 });
@@ -797,6 +805,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             int size;
             try {
                 msg = filterOutboundMessage(msg);
+                // 获取当前待发送的消息的大小, 对于直接发送文件的返回0(支持零拷贝)
                 size = pipeline.estimatorHandle().size(msg);
                 if (size < 0) {
                     size = 0;

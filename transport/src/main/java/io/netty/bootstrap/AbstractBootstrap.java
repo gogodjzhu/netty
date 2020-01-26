@@ -278,11 +278,14 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     }
 
     private ChannelFuture doBind(final SocketAddress localAddress) {
+        // 创建Channel并执行初始化，将channel注册到selector上(但并未监听任意事件)
         final ChannelFuture regFuture = initAndRegister();
         final Channel channel = regFuture.channel();
         if (regFuture.cause() != null) {
             return regFuture;
         }
+
+        // 根据Channel初始化状态选择异步或者同步的方式执行doBind0
 
         if (regFuture.isDone()) {
             // At this point we know that the registration was complete and successful.
@@ -316,6 +319,12 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
     final ChannelFuture initAndRegister() {
         Channel channel = null;
         try {
+            /**
+             * 依赖channel工厂创建channel实例
+             * channel工厂有两种配置方法:
+             * 1. 通过{@link AbstractBootstrap#channel(Class)}方法指定channel类型后，使用默认的反射工厂类
+             * 2. 通过{@link AbstractBootstrap#channelFactory(io.netty.channel.ChannelFactory)}方法直接指定自定义的工厂类
+            */
             channel = channelFactory.newChannel();
             init(channel);
         } catch (Throwable t) {
@@ -327,6 +336,7 @@ public abstract class AbstractBootstrap<B extends AbstractBootstrap<B, C>, C ext
             return new DefaultChannelPromise(channel, GlobalEventExecutor.INSTANCE).setFailure(t);
         }
 
+        // 将创建的channel注册到EventLoopGroup中，本质上是将channel的关注事件注册到Selector上
         ChannelFuture regFuture = config().group().register(channel);
         if (regFuture.cause() != null) {
             if (channel.isRegistered()) {

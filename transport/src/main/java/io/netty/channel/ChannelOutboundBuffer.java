@@ -134,6 +134,7 @@ public final class ChannelOutboundBuffer {
     /**
      * Add a flush to this {@link ChannelOutboundBuffer}. This means all previous added messages are marked as flushed
      * and so you will be able to handle them.
+     * 对当前buffer执行flush操作，即将{@link this#unflushedEntry}队列的entry移到{@link this#flushedEntry}队列
      */
     public void addFlush() {
         // There is no need to process all entries if there was already a flush before and no new messages
@@ -142,13 +143,16 @@ public final class ChannelOutboundBuffer {
         // See https://github.com/netty/netty/issues/2577
         Entry entry = unflushedEntry;
         if (entry != null) {
+            // 将缓存entry从unflushed移到flushed队列
             if (flushedEntry == null) {
                 // there is no flushedEntry yet, so start with the entry
                 flushedEntry = entry;
             }
             do {
                 flushed ++;
+                // 标记Future Promise不能撤销, 标记成功返回true
                 if (!entry.promise.setUncancellable()) {
+                    // TODO cancel操作的目的是什么?
                     // Was cancelled so make sure we free up memory and notify about the freed bytes
                     int pending = entry.cancel();
                     decrementPendingOutboundBytes(pending, false, true);
@@ -176,6 +180,7 @@ public final class ChannelOutboundBuffer {
 
         long newWriteBufferSize = TOTAL_PENDING_SIZE_UPDATER.addAndGet(this, size);
         if (newWriteBufferSize > channel.config().getWriteBufferHighWaterMark()) {
+            // 大于高水位, 更新buffer为不可写状态. 并触发pipeline的 写状态变化 事件
             setUnwritable(invokeLater);
         }
     }
@@ -366,7 +371,11 @@ public final class ChannelOutboundBuffer {
      * {@link #nioBufferCount()} and {@link #nioBufferSize()} will return the number of NIO buffers in the returned
      * array and the total number of readable bytes of the NIO buffers respectively.
      * <p>
+     * 将netty封装的ByteBuf消息重新封装为NIO的 Buffer对象数组, 并同时更新当前对象的{@link #nioBufferCount}和{@link #nioBufferSize}
+     * 属性
+     *
      * Note that the returned array is reused and thus should not escape
+     * 注意返回的是direct nio Buffer, 可重用, 不能暴露给用户接口防止不安全操作
      * {@link AbstractChannel#doWrite(ChannelOutboundBuffer)}.
      * Refer to {@link NioSocketChannel#doWrite(ChannelOutboundBuffer)} for an example.
      * </p>
@@ -377,9 +386,10 @@ public final class ChannelOutboundBuffer {
         final InternalThreadLocalMap threadLocalMap = InternalThreadLocalMap.get();
         ByteBuffer[] nioBuffers = NIO_BUFFERS.get(threadLocalMap);
         Entry entry = flushedEntry;
-        while (isFlushedEntry(entry) && entry.msg instanceof ByteBuf) {
-            if (!entry.cancelled) {
+        while (isFlushedEntry(entry) && entry.msg instanceof ByteBuf) { // 遍历flushedEntry链表
+            if (!entry.cancelled) { // entry对应的Future promise未撤销
                 ByteBuf buf = (ByteBuf) entry.msg;
+                // 单个buffer内部结构, End-->--ReaderIndex-->--WriteIndex-->--Head
                 final int readerIndex = buf.readerIndex();
                 final int readableBytes = buf.writerIndex() - readerIndex;
 
@@ -404,10 +414,12 @@ public final class ChannelOutboundBuffer {
                         entry.count = count =  buf.nioBufferCount();
                     }
                     int neededSpace = nioBufferCount + count;
-                    if (neededSpace > nioBuffers.length) {
+                    if (neededSpace > nioBuffers.length) { // 超出现有缓存规模，增加缓存
                         nioBuffers = expandNioBufferArray(nioBuffers, neededSpace, nioBufferCount);
                         NIO_BUFFERS.set(threadLocalMap, nioBuffers);
                     }
+                    /** 下面对entry内仅有一个buffer 及 有多个buffer的情况分别封装, 最终的实现的效果是一样的, 一个nettyByteBuf
+                     * 对应返回数组中一个nio ByteBuffer元素 */
                     if (count == 1) {
                         ByteBuffer nioBuf = entry.buf;
                         if (nioBuf == null) {
@@ -546,6 +558,10 @@ public final class ChannelOutboundBuffer {
         return 1 << index;
     }
 
+    /**
+     * 设置当前buffer可写入状态
+     * @param invokeLater
+     */
     private void setWritable(boolean invokeLater) {
         for (;;) {
             final int oldValue = unwritable;
@@ -559,6 +575,10 @@ public final class ChannelOutboundBuffer {
         }
     }
 
+    /**
+     * 设置当前buffer不可写入状态
+     * @param invokeLater
+     */
     private void setUnwritable(boolean invokeLater) {
         for (;;) {
             final int oldValue = unwritable;

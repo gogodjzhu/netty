@@ -125,6 +125,11 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
         return heapBuffer(DEFAULT_INITIAL_CAPACITY);
     }
 
+    /**
+     * 创建指定大小的Buffer, 方法根据系统选择创建直接内存(DirectBuffer)或堆内存(HeapBuffer)
+     * @param initialCapacity
+     * @return
+     */
     @Override
     public ByteBuf ioBuffer(int initialCapacity) {
         if (PlatformDependent.hasUnsafe()) {

@@ -137,7 +137,10 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
         if (RESULT_UPDATER.compareAndSet(this, null, UNCANCELLABLE)) {
             return true;
         }
+        // 此次标记Future为不可取消的状态失败
+
         Object result = this.result;
+        // Future没有完成 也没有 取消, 返回false, 外部调用方法需要对Future对应的操作专门处理
         return !isDone0(result) || !isCancelled0(result);
     }
 

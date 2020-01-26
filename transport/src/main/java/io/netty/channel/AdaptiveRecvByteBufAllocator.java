@@ -40,11 +40,14 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
     private static final int[] SIZE_TABLE;
 
     static {
+        // 初始化SIZE_TABLE
         List<Integer> sizeTable = new ArrayList<Integer>();
+        // 512之前按16步进
         for (int i = 16; i < 512; i += 16) {
             sizeTable.add(i);
         }
 
+        // 512之后翻倍递增
         for (int i = 512; i > 0; i <<= 1) {
             sizeTable.add(i);
         }
@@ -105,8 +108,13 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
             return nextReceiveBufferSize;
         }
 
+        /**
+         * 根据实际需要的字节数从SIZE_TABLE中选取一个合适的分配大小重新决定buffer大小
+         * @param actualReadBytes 实际需要的字节数
+         */
         private void record(int actualReadBytes) {
             if (actualReadBytes <= SIZE_TABLE[Math.max(0, index - INDEX_DECREMENT - 1)]) {
+                // 对于减少buffer比较谨慎，连续两次少于阈值才进行下降
                 if (decreaseNow) {
                     index = Math.max(index - INDEX_DECREMENT, minIndex);
                     nextReceiveBufferSize = SIZE_TABLE[index];
@@ -115,6 +123,7 @@ public class AdaptiveRecvByteBufAllocator extends DefaultMaxMessagesRecvByteBufA
                     decreaseNow = true;
                 }
             } else if (actualReadBytes >= nextReceiveBufferSize) {
+                // 对于增加buffer, 立即执行
                 index = Math.min(index + INDEX_INCREMENT, maxIndex);
                 nextReceiveBufferSize = SIZE_TABLE[index];
                 decreaseNow = false;
