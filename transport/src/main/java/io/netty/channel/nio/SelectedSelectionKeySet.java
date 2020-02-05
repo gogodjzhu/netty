@@ -20,6 +20,12 @@ import java.nio.channels.SelectionKey;
 import java.util.AbstractSet;
 import java.util.Iterator;
 
+/**
+ * Selector({@link sun.nio.ch.SelectorImpl})默认使用HashSet作为selectedKey的容器，结合本容器可以优化性能。改变主要在:
+ * 1. 依赖数组作为底层存储，比HashSet的写操作高
+ * 2. 基于flip操作在两个数组中切换。这样HashSet中的remove操作被AB两个数组交换代替
+ * 3. 取消了Iterator，在读取的时候需要特殊处理
+ */
 final class SelectedSelectionKeySet extends AbstractSet<SelectionKey> {
 
     private SelectionKey[] keysA;
