@@ -758,8 +758,11 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         if (inEventLoop) {
             addTask(task);
         } else {
+            // 启动线程
             startThread();
+            // 将新增的task加入任务队列
             addTask(task);
+            // 如果线程已关闭 那么 把task移除
             if (isShutdown() && removeTask(task)) {
                 reject();
             }
@@ -859,7 +862,7 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
     }
 
     /**
-     * 尝试在当前实例的线程池中启动一个Runnable,
+     * 启动本线程实例
      */
     private void doStartThread() {
         assert thread == null;
