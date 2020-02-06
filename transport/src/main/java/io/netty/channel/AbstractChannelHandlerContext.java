@@ -81,6 +81,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
 
     // Will be set to null if no child executor should be used, otherwise it will be set to the
     // child executor.
+    // 执行此Context的子executor, 若设为null则使用所属channel创建时绑定的eventExecutor(EventLoop)
     final EventExecutor executor;
     private ChannelFuture succeededFuture;
 
@@ -381,6 +382,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
      * 回调当前context绑定handler的channelRead()方法
      */
     private void invokeChannelRead(Object msg) {
+        // 判断Handler是否处于可执行状态
         if (invokeHandler()) {
             try {
                 ((ChannelInboundHandler) handler()).channelRead(this, msg);
@@ -388,6 +390,7 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
                 notifyHandlerException(t);
             }
         } else {
+            // 跳过当前Handler的处理, 直接传播给下级
             fireChannelRead(msg);
         }
     }

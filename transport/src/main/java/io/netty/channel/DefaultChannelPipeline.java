@@ -203,10 +203,12 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
         final AbstractChannelHandlerContext newCtx;
         synchronized (this) {
+            // 检查handler实例是否重复使用, 防止竞态问题
             checkMultiplicity(handler);
 
             newCtx = newContext(group, filterName(name, handler), handler);
 
+            // 更新Pipeline(本质是更改链上的节点,即Context的prev,next指针)
             addLast0(newCtx);
 
             // If the registered is false it means that the channel was not registered on an eventloop yet.
@@ -230,6 +232,7 @@ public class DefaultChannelPipeline implements ChannelPipeline {
                 return this;
             }
         }
+        // handler添加到Pipeline成功, 回调Handler#handlerAdded()方法
         callHandlerAdded0(newCtx);
         return this;
     }
