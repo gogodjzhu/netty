@@ -240,6 +240,7 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
             // 对于新建连接, 此channel为NioSocketChannel(netty对java SocketChannel的封装)
             final Channel child = (Channel) msg;
 
+            // 将ServerBootstrap#childHandler()方法配置的Handler添加进来
             child.pipeline().addLast(childHandler);
 
             for (Entry<ChannelOption<?>, Object> e: childOptions) {
@@ -257,7 +258,8 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
             }
 
             try {
-                // 将此SocketChannel注册到childGroup(workerGroup)
+                // 将此SocketChannel注册到childGroup(workerGroup), 并在判断执行线程非Channel绑定的workerNioEventLoop时,
+                // 启动worker线程执行具体的channel绑定任务
                 childGroup.register(child).addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture future) throws Exception {
