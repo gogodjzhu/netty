@@ -472,6 +472,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             if (eventLoop.inEventLoop()) {
                 register0(promise);
             } else {
+                // 判断当前线程非EventLoop实体所属的线程, 启动之
                 try {
                     eventLoop.execute(new Runnable() {
                         @Override
