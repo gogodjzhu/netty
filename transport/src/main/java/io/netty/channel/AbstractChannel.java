@@ -805,6 +805,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
             int size;
             try {
+                // 将msg进行过滤和修饰, 默认无处理, 由子类Channel实现
                 msg = filterOutboundMessage(msg);
                 // 获取当前待发送的消息的大小, 对于直接发送文件的返回0(支持零拷贝)
                 size = pipeline.estimatorHandle().size(msg);
