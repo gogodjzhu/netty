@@ -715,6 +715,11 @@ abstract class AbstractChannelHandlerContext extends DefaultAttributeMap
         return this;
     }
 
+    /**
+     * 按照tail->head的次序遍历Pipeline上的handler, 每个handler实际可以通过覆盖read()方法来截获此事件
+     * 若无handler拦截此事件的传播(默认的方法{@link this#read()}仅作传播)，最终会去到{@link DefaultChannelPipeline.HeadContext#read(ChannelHandlerContext)}
+     * 方才启动channel的读操作
+     */
     private void invokeRead() {
         if (invokeHandler()) {
             try {
