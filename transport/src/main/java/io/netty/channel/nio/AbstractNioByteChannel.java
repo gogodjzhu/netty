@@ -292,9 +292,11 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
     protected final void incompleteWrite(boolean setOpWrite) {
         // Did not write completely.
         if (setOpWrite) {
+            // 外层调用认为当前socket不能写入, 停止写入, 注册OP_WRITE事件等待os通知
             setOpWrite();
         } else {
             // Schedule flush again later so other tasks can be picked up in the meantime
+            // 外层调用认为当前socket还可以写入更多数据, 新增一个task异步继续发送
             Runnable flushTask = this.flushTask;
             if (flushTask == null) {
                 flushTask = this.flushTask = new Runnable() {

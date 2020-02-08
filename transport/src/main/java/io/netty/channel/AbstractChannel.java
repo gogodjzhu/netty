@@ -830,10 +830,15 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 return;
             }
 
+            // 将outboundBuffer的unflushed链表数据移到flushed链表
             outboundBuffer.addFlush();
+            // 对outboundBuffer的flushed链表执行发送
             flush0();
         }
 
+        /**
+         * 将{@link ChannelOutboundBuffer#flushedEntry}链表内的Entry发送出去
+         */
         @SuppressWarnings("deprecation")
         protected void flush0() {
             if (inFlush0) {

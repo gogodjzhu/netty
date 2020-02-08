@@ -383,10 +383,11 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
         for (;;) {
+            // flushed链表剩余元素的数量
             int size = in.size();
             if (size == 0) {
                 // All written so clear OP_WRITE
-                clearOpWrite();
+                clearOpWrite(); // flushed链表发送结束,清空SelectionKey#OP_WRITE
                 break;
             }
             long writtenBytes = 0;
@@ -394,8 +395,11 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
             boolean setOpWrite = false;
 
             // Ensure the pending writes are made of ByteBufs only.
+            // buffer.flushedEntry链表转为nioByteBuffer数组, 仅仅转换in中类型为ByteBuf的元素
             ByteBuffer[] nioBuffers = in.nioBuffers();
+            // 待发送的buffer数, 即nioBuffers数组元素数量
             int nioBufferCnt = in.nioBufferCount();
+            // 待发送数据的字节数, 即nioBuffers所有元素总字节数
             long expectedWrittenBytes = in.nioBufferSize();
             SocketChannel ch = javaChannel();
 
@@ -404,18 +408,20 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
             switch (nioBufferCnt) {
                 case 0:
                     // We have something else beside ByteBuffers to write so fallback to normal writes.
-                    // TODO 什么例外会进入此条件?
+                    // 由于in中可能包括非ByteBuf类型的元素(比如直接发送文件的FileRegion类型),nioBuffers()方法
+                    // 不会将其放入数组, 以致cnt为0. 本方法仅处理nioByteBuffer类型的发送, 交给父类处理
                     super.doWrite(in);
                     return;
-                case 1:
-                    // 单个buffer使用
+                case 1:// 单个buffer使用
                     // Only one ByteBuf so use non-gathering write
                     ByteBuffer nioBuffer = nioBuffers[0];
+                    // 只做有限次(默认16)循环, 防止单个连接占用太多资源
                     for (int i = config().getWriteSpinCount() - 1; i >= 0; i --) {
-                        // nio SocketChannel发送 nio ByteBuffer
+                        // nio SocketChannel发送 nio ByteBuffer, 返回实际发送的字节数(大小取决于tcp协议)
                         final int localWrittenBytes = ch.write(nioBuffer);
                         if (localWrittenBytes == 0) {
-                            // 单个Buffer(in)发送完成, 标记setOpWrite, 在后续用于注册OP_WRITE事件
+                            // nioBuffer有数据, 但socket发送出去的字节数为0, 设置setOpWrite=true, 退出发送循环, 且后续不会马上
+                            // 新增task继续发送, 而是注册OP_WRITE等待os可以发送更多数据的时候继续发送
                             setOpWrite = true;
                             break;
                         }
@@ -427,10 +433,10 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
                         }
                     }
                     break;
-                default:
-                    // 对于多个Buffer使用
+                default:// 对于多个Buffer使用
+                    // 只做有限次(默认16)循环, 防止单个连接占用太多资源
                     for (int i = config().getWriteSpinCount() - 1; i >= 0; i --) {
-                        // 使用 gathering writes 发送多个NIO ByteBuffer
+                        // 使用 gathering writes 发送多个NIO ByteBuffer, 返回实际发送的字节数(大小取决于tcp协议)
                         final long localWrittenBytes = ch.write(nioBuffers, 0, nioBufferCnt);
                         if (localWrittenBytes == 0) {
                             setOpWrite = true;
@@ -447,10 +453,14 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
             }
 
             // Release the fully written buffers, and update the indexes of the partially written buffer.
+            // 更新处理进度
             in.removeBytes(writtenBytes);
 
-            if (!done) { // 当前Buffer(in)未发送完成,
+            if (!done) {
                 // Did not write all buffers completely.
+                // 未完成flushed队列中所有的buffer的发送会进入此方法
+                // setOpWrite=true,因为socket的问题本次未写入任何数据,是系统原因故注册SelectionKey#OP_WRITE事件,等待系统可写入再写
+                // setOpWrite=false,表示此次socket发送了部分数据,认为还可以马上发送更多的数据,这里直接添加task来异步执行新的写入
                 incompleteWrite(setOpWrite);
                 break;
             }
