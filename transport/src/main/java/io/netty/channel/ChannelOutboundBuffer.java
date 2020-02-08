@@ -801,6 +801,7 @@ public final class ChannelOutboundBuffer {
         }
 
         static Entry newInstance(Object msg, int size, long total, ChannelPromise promise) {
+            // 从线程对象池中获取entry
             Entry entry = RECYCLER.get();
             entry.msg = msg;
             entry.pendingSize = size;
