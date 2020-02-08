@@ -143,17 +143,17 @@ public final class ChannelOutboundBuffer {
         // See https://github.com/netty/netty/issues/2577
         Entry entry = unflushedEntry;
         if (entry != null) {
-            // 将缓存entry从unflushed移到flushed队列
             if (flushedEntry == null) {
                 // there is no flushedEntry yet, so start with the entry
+                // flushedEntry为空即当前无数据正在发送, 那么从unflushedEntry开始发送
                 flushedEntry = entry;
             }
             do {
                 flushed ++;
                 // 标记Future Promise不能撤销, 标记成功返回true
                 if (!entry.promise.setUncancellable()) {
-                    // TODO cancel操作的目的是什么?
                     // Was cancelled so make sure we free up memory and notify about the freed bytes
+                    // setUncancellable()返回false表示promise已经取消, 这里对资源进行释放
                     int pending = entry.cancel();
                     decrementPendingOutboundBytes(pending, false, true);
                 }
@@ -161,6 +161,7 @@ public final class ChannelOutboundBuffer {
             } while (entry != null);
 
             // All flushed so reset unflushedEntry
+            // 重开未发送的链表
             unflushedEntry = null;
         }
     }
