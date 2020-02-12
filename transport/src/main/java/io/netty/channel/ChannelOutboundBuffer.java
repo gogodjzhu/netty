@@ -284,6 +284,10 @@ public final class ChannelOutboundBuffer {
         return remove0(cause, true);
     }
 
+    /**
+     * 移除flushed链表上的一个待发送数据，并使用入参的throwable作为异常抛出
+     * @return 成功移除一个返回true，否则返回false
+     */
     private boolean remove0(Throwable cause, boolean notifyWritability) {
         Entry e = flushedEntry;
         if (e == null) {
@@ -626,6 +630,9 @@ public final class ChannelOutboundBuffer {
         return flushed == 0;
     }
 
+    /**
+     * failed掉所有的数据
+     */
     void failFlushed(Throwable cause, boolean notify) {
         // Make sure that this method does not reenter.  A listener added to the current promise can be notified by the
         // current thread in the tryFailure() call of the loop below, and the listener can trigger another fail() call

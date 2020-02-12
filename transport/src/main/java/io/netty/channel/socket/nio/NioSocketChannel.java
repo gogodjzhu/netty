@@ -37,6 +37,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
@@ -476,7 +477,9 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
         @Override
         protected Executor prepareToClose() {
             try {
+                /** {@link StandardSocketOptions#SO_LINGER}配置为正时有效，代表close方法在返回前所需等待的空闲时间(单位秒)*/
                 if (javaChannel().isOpen() && config().getSoLinger() > 0) {
+                    // 因为so_linger的优雅关闭原则，若不提前取消selectionKey的事件监听，可能有新的消息进来，造成无法关闭
                     // We need to cancel this key of the channel so we may not end up in a eventloop spin
                     // because we try to read or write until the actual close happens which may be later due
                     // SO_LINGER handling.

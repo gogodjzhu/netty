@@ -16,6 +16,7 @@
 package io.netty.channel;
 
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.channel.nio.AbstractNioChannel;
 import io.netty.util.DefaultAttributeMap;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.internal.PlatformDependent;
@@ -613,6 +614,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
         public final void close(final ChannelPromise promise) {
             assertEventLoop();
 
+            // notify=false 底层不需要针对关闭导致的可写状态触发回调
             close(promise, CLOSE_CLOSED_CHANNEL_EXCEPTION, CLOSE_CLOSED_CHANNEL_EXCEPTION, false);
         }
 
@@ -644,7 +646,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
 
             final boolean wasActive = isActive();
+            // 先设置为null，防止更多的写入
             this.outboundBuffer = null; // Disallow adding any messages and flushes to outboundBuffer.
+            // 正式关闭前的预备方法，若执行了预备方法，那么这里返回一个Executor，剩下的关闭操作就必须在此Executor中执行
+            // 这样可以保证关闭方法不被阻塞，同时又保证了prepare方法正确执行
+            // 目前主要的实现由NioSocketChannel提供，对SO_LINGER优雅关闭导致无法关闭的问题，提供先register再关闭的策略
             Executor closeExecutor = prepareToClose();
             if (closeExecutor != null) {
                 closeExecutor.execute(new Runnable() {
@@ -673,17 +679,22 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                     doClose0(promise);
                 } finally {
                     // Fail all the queued messages.
-                    outboundBuffer.failFlushed(cause, notify);
-                    outboundBuffer.close(closeCause);
+                    outboundBuffer.failFlushed(cause, notify); // failed掉outboundBuffer中未发送(flushed)的数据
+                    outboundBuffer.close(closeCause); // 关闭outboundBuffer, 并移除unflushed数据
                 }
                 if (inFlush0) {
+                    // 正在处理flush操作，需要等待
                     invokeLater(new Runnable() {
                         @Override
                         public void run() {
+                            // deregister即cancel掉SelectionKey
+                            // channel先后触发的状态是: inactive->unregistered
                             fireChannelInactiveAndDeregister(wasActive);
                         }
                     });
                 } else {
+                    // deregister即cancel掉SelectionKey
+                    // channel先后触发的状态是: inactive->unregistered
                     fireChannelInactiveAndDeregister(wasActive);
                 }
             }
@@ -745,10 +756,15 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 @Override
                 public void run() {
                     try {
+                        /**
+                         * 调用子类的实现, niochannel实现为{@link AbstractNioChannel#doDeregister()}
+                         */
                         doDeregister();
                     } catch (Throwable t) {
                         logger.warn("Unexpected exception occurred while deregistering a channel.", t);
                     } finally {
+                        /*先后触发channelInactive 和 channelUnregistered 事件 */
+
                         if (fireChannelInactive) {
                             pipeline.fireChannelInactive();
                         }
