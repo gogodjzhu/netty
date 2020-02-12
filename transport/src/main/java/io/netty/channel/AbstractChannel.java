@@ -651,6 +651,10 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             // 正式关闭前的预备方法，若执行了预备方法，那么这里返回一个Executor，剩下的关闭操作就必须在此Executor中执行
             // 这样可以保证关闭方法不被阻塞，同时又保证了prepare方法正确执行
             // 目前主要的实现由NioSocketChannel提供，对SO_LINGER优雅关闭导致无法关闭的问题，提供先register再关闭的策略
+            //
+            // SO_LINGER优雅关闭的问题:
+            // 如果SO_LINGER配置了，close()方法会阻塞直到1.没有新的数据需要读写或者2.超时，无论是哪种情况都会导致当前EventLoop的阻塞
+            // 这会导致EventLoop无法处理其他连接事务。所以这里我们判断如果开启了SO_LINGER则把关闭操作放到一个独立的线程中去处理
             Executor closeExecutor = prepareToClose();
             if (closeExecutor != null) {
                 closeExecutor.execute(new Runnable() {
