@@ -684,7 +684,7 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
                 } finally {
                     // Fail all the queued messages.
                     outboundBuffer.failFlushed(cause, notify); // failed掉outboundBuffer中未发送(flushed)的数据
-                    outboundBuffer.close(closeCause); // 关闭outboundBuffer, 并移除unflushed数据
+                    outboundBuffer.close(closeCause); // 关闭outboundBuffer, 并移除unflushed数据(不同于flushed，unflused还需要回收资源)
                 }
                 if (inFlush0) {
                     // 正在处理flush操作，需要等待
