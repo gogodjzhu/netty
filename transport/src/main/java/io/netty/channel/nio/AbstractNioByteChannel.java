@@ -79,6 +79,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                     key.interestOps(key.interestOps() & ~readInterestOp);
                     pipeline.fireUserEventTriggered(ChannelInputShutdownEvent.INSTANCE);
                 } else {
+                    // 调用close方法关闭channel, 此方法开始跟主动关闭连接一致
                     close(voidPromise());
                 }
             }
@@ -104,6 +105,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
 
         @Override
         public final void read() {
+            // 当前channel接收到数据之后的处理入口
             final ChannelConfig config = config();
             final ChannelPipeline pipeline = pipeline();
             final ByteBufAllocator allocator = config.getAllocator();
@@ -123,7 +125,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                         // nothing was read. release the buffer.
                         byteBuf.release();
                         byteBuf = null;
-                        close = allocHandle.lastBytesRead() < 0;
+                        close = allocHandle.lastBytesRead() < 0; // 此次读事件消费的字节数为负, 即连接断开
                         break;
                     }
 
