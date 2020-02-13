@@ -198,15 +198,13 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 for (int i = writeSpinCount - 1; i >= 0; i --) {
                     // 执行发送, 返回值为实际发送的字节数
                     int localFlushedAmount = doWriteBytes(buf);
-                    // 正常情况下doWriteBytes(buf)方法应该将buf内的数据发送出去, 则返回的值应该大于0. 如果返回值为0表示数据为写出,
+                    // 正常情况下doWriteBytes(buf)方法应该将buf内的数据发送出去, 则返回的值应该大于0. 如果返回值为0表示无数据写出,
                     // 将setOpWrite置为true, 后续会注册OP_WRITE事件等待再次写入
                     if (localFlushedAmount == 0) {
                         setOpWrite = true; // return0, 表示buf内的已有可读数据已经全部通过channel发送完毕
                         break;
                     }
 
-                    // TODO 为什么要分两步判断消费结束? done变量为什么不能直接通过localFlushedAmount==0来判断? 换句话说,
-                    //  doWriteBytes返回0 跟 buf.isReadable()返回false有什么区别?
                     flushedAmount += localFlushedAmount;
                     // 根据buffer的writeIndex/readIndex来判断此buffer的消费进度
                     if (!buf.isReadable()) {
@@ -214,6 +212,12 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                         done = true;
                         break;
                     }
+
+                    /*
+                     * doWriteBytes返回0 跟 buf.isReadable()返回false有什么区别?
+                     * 前者表示没往buf写入数据，原因有两个: 1.网络无法发出更多的数据, 2.buf无更多数据可读
+                     * 后者表示buf无更多数据可写
+                     */
                 }
 
                 // 修改buffer对应Future Promise的发送进度
