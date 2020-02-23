@@ -201,6 +201,7 @@ public final class ChannelOutboundBuffer {
 
         long newWriteBufferSize = TOTAL_PENDING_SIZE_UPDATER.addAndGet(this, -size);
         if (notifyWritability && newWriteBufferSize < channel.config().getWriteBufferLowWaterMark()) {
+            // 大于高水位线变成不可写, 之后要降到低水位线才变成可写. 防止频繁改动writable状态
             setWritable(invokeLater);
         }
     }
