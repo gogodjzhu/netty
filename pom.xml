@@ -223,9 +223,6 @@
     <!-- Configure the os-maven-plugin extension to expand the classifier on                  -->
     <!-- Fedora-"like" systems. This is currently only used for the netty-tcnative dependency -->
     <os.detection.classifierWithLikes>fedora</os.detection.classifierWithLikes>
-    <tcnative.artifactId>netty-tcnative</tcnative.artifactId>
-    <tcnative.version>1.1.33.Fork23</tcnative.version>
-    <tcnative.classifier>${os.detected.classifier}</tcnative.classifier>
     <epoll.classifier>${os.detected.name}-${os.detected.arch}</epoll.classifier>
     <logging.config>${project.basedir}/../common/src/test/resources/logback-test.xml</logging.config>
     <logging.logLevel>debug</logging.logLevel>
@@ -235,32 +232,32 @@
   <modules>
     <module>common</module>
     <module>buffer</module>
-    <module>codec</module>
-    <module>codec-dns</module>
-    <module>codec-haproxy</module>
-    <module>codec-http</module>
-    <module>codec-http2</module>
-    <module>codec-memcache</module>
-    <module>codec-mqtt</module>
-    <module>codec-redis</module>
-    <module>codec-smtp</module>
-    <module>codec-socks</module>
-    <module>codec-stomp</module>
-    <module>codec-xml</module>
-    <module>resolver</module>
-    <module>resolver-dns</module>
+<!--    <module>codec</module>-->
+    <!-- <module>codec-dns</module> -->
+    <!-- <module>codec-haproxy</module> -->
+    <!-- <module>codec-http</module> -->
+    <!-- <module>codec-http2</module> -->
+    <!-- <module>codec-memcache</module> -->
+    <!-- <module>codec-mqtt</module> -->
+    <!-- <module>codec-redis</module> -->
+    <!-- <module>codec-smtp</module> -->
+    <!-- <module>codec-socks</module> -->
+    <!-- <module>codec-stomp</module> -->
+    <!-- <module>codec-xml</module> -->
+<!--    <module>resolver</module>-->
+    <!-- <module>resolver-dns</module> -->
     <module>transport</module>
-    <module>transport-rxtx</module>
-    <module>transport-sctp</module>
-    <module>transport-udt</module>
-    <module>handler</module>
-    <module>handler-proxy</module>
+    <!-- <module>transport-rxtx</module> -->
+    <!-- <module>transport-sctp</module> -->
+    <!-- <module>transport-udt</module> -->
+<!--    <module>handler</module>-->
+    <!-- <module>handler-proxy</module> -->
     <module>example</module>
-    <module>testsuite</module>
-    <module>testsuite-osgi</module>
-    <module>microbench</module>
-    <module>all</module>
-    <module>tarball</module>
+<!--    <module>testsuite</module>-->
+    <!-- <module>testsuite-osgi</module> -->
+    <!-- <module>microbench</module> -->
+<!--    <module>all</module>-->
+<!--    <module>tarball</module>-->
   </modules>
 
   <dependencyManagement>
@@ -307,16 +304,6 @@
         <groupId>com.google.protobuf.nano</groupId>
         <artifactId>protobuf-javanano</artifactId>
         <version>3.0.0-alpha-5</version>
-      </dependency>
-
-      <!-- Our own Tomcat Native fork - completely optional, used for acclerating SSL with OpenSSL. -->
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>${tcnative.artifactId}</artifactId>
-        <version>${tcnative.version}</version>
-        <classifier>${tcnative.classifier}</classifier>
-        <scope>compile</scope>
-        <optional>true</optional>
       </dependency>
 
       <!--
@@ -740,59 +727,6 @@
           </execution>
         </executions>
       </plugin>
-      <plugin>
-        <artifactId>maven-checkstyle-plugin</artifactId>
-        <version>2.12.1</version>
-        <executions>
-          <execution>
-            <id>check-style</id>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <phase>validate</phase>
-            <configuration>
-              <consoleOutput>true</consoleOutput>
-              <logViolationsToConsole>true</logViolationsToConsole>
-              <failsOnError>true</failsOnError>
-              <failOnViolation>true</failOnViolation>
-              <configLocation>io/netty/checkstyle.xml</configLocation>
-              <includeTestSourceDirectory>true</includeTestSourceDirectory>
-            </configuration>
-          </execution>
-        </executions>
-        <dependencies>
-          <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>netty-build</artifactId>
-            <version>${netty.build.version}</version>
-          </dependency>
-        </dependencies>
-      </plugin>
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>xml-maven-plugin</artifactId>
-        <version>1.0.1</version>
-        <executions>
-          <execution>
-            <id>check-style</id>
-            <goals>
-              <goal>check-format</goal>
-            </goals>
-            <phase>validate</phase>
-          </execution>
-        </executions>
-        <configuration>
-          <formatFileSets>
-            <formatFileSet>
-              <directory>${project.basedir}</directory>
-              <includes>
-                <include>**/pom.xml</include>
-              </includes>
-            </formatFileSet>
-          </formatFileSets>
-          <useDefaultFormatFileSet>false</useDefaultFormatFileSet>
-        </configuration>
-      </plugin>
       <!-- Download the npn-boot.jar in advance to add it to the boot classpath. -->
       <plugin>
         <artifactId>maven-dependency-plugin</artifactId>
@@ -1169,113 +1103,6 @@
           <version>2.4.3</version>
         </plugin>
 
-        <!-- Workaround for the 'M2E plugin execution not covered' problem.
-             See: http://wiki.eclipse.org/M2E_plugin_execution_not_covered -->
-        <plugin>
-          <groupId>org.eclipse.m2e</groupId>
-          <artifactId>lifecycle-mapping</artifactId>
-          <version>1.0.0</version>
-          <configuration>
-            <lifecycleMappingMetadata>
-              <pluginExecutions>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-antrun-plugin</artifactId>
-                    <versionRange>[1.7,)</versionRange>
-                    <goals>
-                      <goal>run</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <ignore />
-                  </action>
-                </pluginExecution>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-checkstyle-plugin</artifactId>
-                    <versionRange>[1.0,)</versionRange>
-                    <goals>
-                      <goal>check</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <ignore />
-                  </action>
-                </pluginExecution>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-enforcer-plugin</artifactId>
-                    <versionRange>[1.0,)</versionRange>
-                    <goals>
-                      <goal>enforce</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <ignore />
-                  </action>
-                </pluginExecution>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-clean-plugin</artifactId>
-                    <versionRange>[1.0,)</versionRange>
-                    <goals>
-                      <goal>clean</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <ignore />
-                  </action>
-                </pluginExecution>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.apache.felix</groupId>
-                    <artifactId>maven-bundle-plugin</artifactId>
-                    <versionRange>[2.4,)</versionRange>
-                    <goals>
-                      <goal>manifest</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <ignore />
-                  </action>
-                </pluginExecution>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.fusesource.hawtjni</groupId>
-                    <artifactId>maven-hawtjni-plugin</artifactId>
-                    <versionRange>[1.10,)</versionRange>
-                    <goals>
-                      <goal>generate</goal>
-                      <goal>build</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <ignore />
-                  </action>
-                </pluginExecution>
-                <pluginExecution>
-                  <pluginExecutionFilter>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-dependency-plugin</artifactId>
-                    <versionRange>[2.8,)</versionRange>
-                    <goals>
-                      <goal>get</goal>
-                      <goal>copy</goal>
-                      <goal>properties</goal>
-                    </goals>
-                  </pluginExecutionFilter>
-                  <action>
-                    <ignore />
-                  </action>
-                </pluginExecution>
-              </pluginExecutions>
-            </lifecycleMappingMetadata>
-          </configuration>
-        </plugin>
       </plugins>
     </pluginManagement>
   </build>
