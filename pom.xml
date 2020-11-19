@@ -223,6 +223,9 @@
     <!-- Configure the os-maven-plugin extension to expand the classifier on                  -->
     <!-- Fedora-"like" systems. This is currently only used for the netty-tcnative dependency -->
     <os.detection.classifierWithLikes>fedora</os.detection.classifierWithLikes>
+    <tcnative.artifactId>netty-tcnative</tcnative.artifactId>
+    <tcnative.version>1.1.33.Fork23</tcnative.version>
+    <tcnative.classifier>${os.detected.classifier}</tcnative.classifier>
     <epoll.classifier>${os.detected.name}-${os.detected.arch}</epoll.classifier>
     <logging.config>${project.basedir}/../common/src/test/resources/logback-test.xml</logging.config>
     <logging.logLevel>debug</logging.logLevel>
@@ -232,10 +235,10 @@
   <modules>
     <module>common</module>
     <module>buffer</module>
-<!--    <module>codec</module>-->
+    <module>codec</module>
     <!-- <module>codec-dns</module> -->
     <!-- <module>codec-haproxy</module> -->
-    <!-- <module>codec-http</module> -->
+     <module>codec-http</module>
     <!-- <module>codec-http2</module> -->
     <!-- <module>codec-memcache</module> -->
     <!-- <module>codec-mqtt</module> -->
@@ -248,9 +251,9 @@
     <!-- <module>resolver-dns</module> -->
     <module>transport</module>
     <!-- <module>transport-rxtx</module> -->
-    <!-- <module>transport-sctp</module> -->
+     <module>transport-sctp</module>
     <!-- <module>transport-udt</module> -->
-<!--    <module>handler</module>-->
+    <module>handler</module>
     <!-- <module>handler-proxy</module> -->
     <module>example</module>
 <!--    <module>testsuite</module>-->
@@ -304,6 +307,16 @@
         <groupId>com.google.protobuf.nano</groupId>
         <artifactId>protobuf-javanano</artifactId>
         <version>3.0.0-alpha-5</version>
+      </dependency>
+
+      <!-- Our own Tomcat Native fork - completely optional, used for acclerating SSL with OpenSSL. -->
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>${tcnative.artifactId}</artifactId>
+        <version>${tcnative.version}</version>
+        <classifier>${tcnative.classifier}</classifier>
+        <scope>compile</scope>
+        <optional>true</optional>
       </dependency>
 
       <!--
