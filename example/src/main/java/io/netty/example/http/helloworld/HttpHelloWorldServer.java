@@ -54,7 +54,7 @@ public final class HttpHelloWorldServer {
             b.option(ChannelOption.SO_BACKLOG, 1024);
             b.group(bossGroup, workerGroup)
              .channel(NioServerSocketChannel.class)
-             .handler(new LoggingHandler(LogLevel.INFO))
+             .handler(new LoggingHandler(LogLevel.DEBUG)) // 指的是以[DEBUG]等级打日志
              .childHandler(new HttpHelloWorldServerInitializer(sslCtx));
 
             Channel ch = b.bind(PORT).sync().channel();
