@@ -52,7 +52,7 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioServerSocketChannel.class);
 
     /**
-     * 依赖SelectorProvider创建ServerSocketChannel
+     * 依赖SelectorProvider创建ServerSocketChannel, 注意这里创建的是java.nio包中定义的Channel
      */
     private static ServerSocketChannel newSocket(SelectorProvider provider) {
         try {
@@ -87,8 +87,18 @@ public class NioServerSocketChannel extends AbstractNioMessageChannel
 
     /**
      * Create a new instance using the given {@link ServerSocketChannel}.
+     * <br/>
+     * 使用java.nio.ServerSocketChannel对象封装得到io.netty.channel.socket.nio包下的对应'增强型'ServerSocketChannel
      */
     public NioServerSocketChannel(ServerSocketChannel channel) {
+        /*
+        * 逐层调用父类的构造方法(注意实际的调用是倒序的):
+        * 1. NioServerSocketChannelConfig(): 配置NioServerSocketChannelConfig
+        * 2. AbstractNioChannel(): 配置channel初始readInterestOp=<SelectionKey.OP_ACCEPT>, 表示对连接事件的关注
+        *   PS. NioSocketChannel中对应的初始readInterestOp=<SelectionKey.OP_READ>
+        * 3. AbstractChannel(): 配置Channel.Id; 配置unsafe实例; 配置pipeline实例
+        * */
+
         super(null, channel, SelectionKey.OP_ACCEPT);
         config = new NioServerSocketChannelConfig(this, javaChannel().socket());
     }

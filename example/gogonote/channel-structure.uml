@@ -1,0 +1,180 @@
+@startuml
+
+interface ChannelOutboundInvoker {
+    + ChannelFuture bind(localAddress: SocketAddress)
+    + ChannelFuture connect(remoteAddress: SocketAddress)
+    + ChannelFuture disconnect()
+    + ChannelFuture close()
+    + ChannelFuture deregister()
+    + ChannelFuture write(msg: Object)
+
+    + ChannelOutboundInvoker read()
+}
+
+interface AttributeMap {
+    + Attribute attr(key: AttributeKey)
+    + boolean hasAttr(key: AttributeKey)
+}
+
+Channel_Unsafe <--* Channel
+Channel_Unsafe <|.. AbstractChannel_AbstractUnsafe
+interface Channel_Unsafe {
+    + void bind(localAddress: SocketAddress, promise: ChannelPromise)
+    + void connect(remoteAddress: SocketAddress, localAddress: SocketAddress, promise: ChannelPromise)
+    + void disconnect(promise: ChannelPromise)
+    + void close(promise: ChannelPromise)
+    + void deregister(promise: ChannelPromise)
+    + void write(msg: Object, promise: ChannelPromise)
+    + void beginRead() // 触发pipeline中的第一个InboundHandler进行读操作,若已在读,啥都不干
+    + void flush()
+}
+note top: 此内部类负责实际执行传输层任务, 仅提供给netty内部方法调用
+
+ChannelOutboundInvoker <|-- Channel
+AttributeMap <|-- Channel
+interface Channel {
+    + ChannelId id()
+    + EventLoop eventLoop()
+    + Channel parent()
+    + boolean isOpen()
+    + boolean isRegistered()
+    + boolean isActive()
+    + Unsafe unsafe()
+    + ChannelPipeline pipeline()
+}
+
+AbstractChannel_AbstractUnsafe <--* AbstractChannel
+Channel <|.. AbstractChannel
+abstract class AbstractChannel {
+    - parent: Channel
+    - id: ChannelId
+    - unsafe: Channel.Unsafe
+    - pipeline: DefaultChannelPipeline
+    - closeFuture: CloseFuture
+    - localAddress: SocketAddress
+    - remoteAddress: SocketAddress
+    - eventLoop: EventLoop
+
+    + {abstract} void doBind(localAddress: SocketAddress) // 抽象方法
+    + {abstract} void doDisconnect() // 抽象方法
+    + {abstract} void doClose() // 抽象方法
+    + void doRegister()
+    + void doDeregister()
+    + {abstract} void doWrite(in: ChannelOutboundBuffer) // 抽象方法
+    + {abstract} void beginRead() // 抽象方法
+}
+
+abstract class AbstractChannel_AbstractUnsafe {
+    - outboundBuffer: ChannelOutboundBuffer
+    - recvHandle: RecvByteBufAllocator_Handle
+
+    + final void bind(localAddress: SocketAddress, promise: ChannelPromise)
+    + final void disconnect(promise: ChannelPromise)
+    + final void close(promise: ChannelPromise)
+    + final void deregister(promise: ChannelPromise)
+    + final void write(msg: Object, promise: ChannelPromise)
+    + final void beginRead()
+    + final void flush()
+    # void flush0()
+}
+note right of AbstractChannel_AbstractUnsafe
+ 此类定义了IO操作的模板方法,
+ 实现对ChannelPromise的回调操作,
+ 而实际的逻辑调用<b>AbstractChannel#doXXX()</b>方法.
+ 另外, 也负责维护Pipeline的部分生命周期状态流转:
+    - bind->active
+    - disconnect->inactive
+    - deregister->inactive->unregistered
+end note
+
+AbstractNioChannel_AbstractNioUnsafe <--* AbstractNioChannel
+AbstractChannel <|-- AbstractNioChannel
+abstract class AbstractNioChannel {
+    - ch: SelectableChannel
+    - readInterestOp: int
+    - selectionKey: SelectionKey
+    - requestedRemoteAddress: SocketAddress
+
+    # void doRegister() // 覆写AbstractChannel方法, 本质上调用nio.SelectableChannel#register(selector, ops, attr)
+    # void doDeregister() // 覆写AbstractChannel方法
+    # void doBeginRead() // 覆写AbstractChannel方法, 本质上是修改nio.selectionKey的interestOps
+    # {abstract} boolean doConnect(remoteAddress: SocketAddress, localAddress: SocketAddress)
+}
+note left of AbstractNioChannel
+ 此类实现了部分对于Server/Client端nio都一致的操作, 但是更具体的方法亦然留给具体的子类实现:
+    - doBind()
+    - doConnect()
+    - doDisconnect()
+    - doWrite()
+    - doFinished()
+    - isActive()
+end note
+
+AbstractChannel_AbstractUnsafe <|-- AbstractNioChannel_AbstractNioUnsafe
+abstract class AbstractNioChannel_AbstractNioUnsafe {
+    + final void connect(remoteAddress: SocketAddress, localAddress: SocketAddress, promise: ChannelPromise)
+}
+note right of AbstractNioChannel_AbstractNioUnsafe
+ 类似与AbstractChannel_AbstractUnsafe定义模板方法,
+ 实现对ChannelPromise的回调操作, 实际操作交给<b>AbstractNioChannel#doXXX()</b>方法
+end note
+
+AbstractNioChannel <|-- AbstractNioMessageChannel
+abstract class AbstractNioMessageChannel {
+    # {abstract} int doReadMessages(buf: List<Object>)
+    # {abstract} boolean doWriteMessage(msg: Object, in: ChannelOutboundBuffer)
+    # void doWrite(in: ChannelOutboundBuffer)
+}
+
+AbstractNioMessageChannel <|.. NioServerSocketChannel
+class NioServerSocketChannel {
+    # int doReadMessages(buf: List<Object>) // 这里的'读', 指的是接收新连接, 成功返回1, 无新连接返回0
+    # boolean doWriteMessage(msg: Object, in: ChannelOutboundBuffer) // 不能处理写操作, 抛出异常
+}
+
+AbstractNioChannel <|-- AbstractNioByteChannel
+abstract class AbstractNioByteChannel {
+    + doWrite(in: ChannelOutboundBuffer) // 负责发送策略, 具体操作交给下面两个doWriteXXX方法
+
+    # {abstract} int doWriteBytes(buf: ByteBuf)
+    # {abstract} long doWriteFileRegion(region: FileRegion)
+    # {abstract} int doReadBytes(buf: ByteBuf)
+}
+
+AbstractNioByteChannel <|.. NioSocketChannel
+class NioSocketChannel {
+    # void doWrite(in: ChannelOutboundBuffer)
+
+    # int doWriteBytes(buf: ByteBuf) // 本质调用ByteBuf#readBytes(out: GatheringByteChannel, len: int)
+    # long doWriteFileRegion(region: FileRegion) // 本质调用FileRegion#transferTo(target: WritableByteChannel, position: long)
+    # int doReadBytes(buf: ByteBuf) // 本质调用ByteBuf#writeBytes(in: ScatteringByteChannel, len: int)
+}
+note right of NioSocketChannel
+在<u>AbstractNioByteChannel</u>, <u>NioSocketChannel</u>类中
+分别都覆写了<b>doWrite()</b>方法, 不同在于:
+    - NioSocketChannel
+      - 根据Buffer类型(ByteBuf/FileRegion)不同选择写入方式(对于FileRegion委托给父类执行)
+      - 控制连续发送次数(writeSpinCount),防止单连接占用过多资源
+      - 根据ByteBuffer数量选择对应的nio方法执行发送
+      - 本质上的发送最终还是落到NioSocketChannel#doWriteBytes/doWriteFileRegion
+    - AbstractNioByteChannel
+      - 分别处理ByteBuf/FileRegion两种类型的写入
+      - 本质上的发送最终还是落到NioSocketChannel#doWriteBytes/doWriteFileRegion
+PS.两者区别不大, 个人认为有过度设计之嫌
+-----------------
+read方法的逻辑主要放在XXXUnsafe#read()系列方法中, 读的流程是:
+    1. beginRead() 将selectionKey.interestOp置位OP_READ(Client)/OP_ACCEPT(Server)
+    2. EventExecutor启动后, 会循环调用processSelectedKeys()方法获取Channel事件
+    3. 在NioEventLoop判断时间类型为可读事件(OP_READ/OP_ACCEPT)调用unsafe.read()进行处理
+    4. 具体的unsafe(AbstractNioChannel.NioUnsafe)子类read()方法实现对事件分别处理
+        4.1 NioMessageUnsafe, 在Socket下必然是OP_ACCEPT事件,
+            将nio.ServerSocketChannel#accept()结果(即一个新的nio.SocketChannel)封装为netty.NioSocketChannel
+            并作为参数触发pipeline#fireChannelRead(msg:Object)方法
+        4.2 NioByteUnsafe, 在Socket下必然是OP_READ事件,
+            - 会依靠ByteBufAllocator创建ByteBuf实例用于缓存结果(默认实现会根据系统配置创建堆内/堆外,Pooled/UnPooled 内存)
+            - 调用nioSocketChannel#read()方法将数据保存到ByteBuf中, 并触发pipeline#fireChannelRead(msg:Object)事件
+            - RecvByteBufAllocator.Handle 控制读取(包括检查缓存空间/单次read连续读的次数)
+    5. 完成read之后, 触发pipeline#fireChannelReadComplete()事件
+end note
+
+@enduml

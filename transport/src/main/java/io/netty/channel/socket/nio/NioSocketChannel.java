@@ -51,6 +51,9 @@ public class NioSocketChannel extends AbstractNioByteChannel implements io.netty
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(NioSocketChannel.class);
     private static final SelectorProvider DEFAULT_SELECTOR_PROVIDER = SelectorProvider.provider();
 
+    /**
+     * 类似于{@link NioServerSocketChannel#newSocket(SelectorProvider)}
+     */
     private static SocketChannel newSocket(SelectorProvider provider) {
         try {
             /**

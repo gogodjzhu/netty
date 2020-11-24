@@ -169,6 +169,8 @@ public class DefaultPromise<V> extends AbstractFuture<V> implements Promise<V> {
             addListener0(listener);
         }
 
+        // 注意这里！
+        // 在promise已经结束之后, 也可以添加listener, 此时将马上触发回调
         if (isDone()) {
             notifyListeners();
         }

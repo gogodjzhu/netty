@@ -131,6 +131,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
     private final SelectStrategy selectStrategy;
 
+    // ioRatio控制io操作占整体操作的比例, 防止在消息处理过度耗时导致IO无法处理
     private volatile int ioRatio = 50;
     private int cancelledKeys;
     private boolean needsToSelectAgain;
@@ -437,13 +438,13 @@ public final class NioEventLoop extends SingleThreadEventLoop {
 
                 cancelledKeys = 0;
                 needsToSelectAgain = false;
-                final int ioRatio = this.ioRatio;
+                final int ioRatio = this.ioRatio; // 默认50
                 if (ioRatio == 100) {
                     try {
                         processSelectedKeys();
                     } finally {
                         // Ensure we always run tasks.
-                        runAllTasks(); // 在这个run方法中还会处理用户自定义的Task和定时任务Task.
+                        runAllTasks(); // 在这个run方法中还会处理用户自定义的Task和定时任务Task. 注意这里不带超时时间
                     }
                 } else {
                     final long ioStartTime = System.nanoTime();
@@ -452,7 +453,7 @@ public final class NioEventLoop extends SingleThreadEventLoop {
                     } finally {
                         // Ensure we always run tasks.
                         final long ioTime = System.nanoTime() - ioStartTime;
-                        runAllTasks(ioTime * (100 - ioRatio) / ioRatio);
+                        runAllTasks(ioTime * (100 - ioRatio) / ioRatio); // 带超时时间, 防止Task过度占用CPU时间
                     }
                 }
             } catch (Throwable t) {

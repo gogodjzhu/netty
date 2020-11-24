@@ -71,6 +71,8 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
 
     /**
      * Creates a new instance.
+     * <br/>
+     * 注意是在此方法内创建了每个Channel都包含的Pipeline实例
      *
      * @param parent
      *        the parent of this channel. {@code null} if there's no parent.
@@ -537,6 +539,11 @@ public abstract class AbstractChannel extends DefaultAttributeMap implements Cha
             }
         }
 
+        /**
+         * 模板方法, 主要
+         * @param localAddress
+         * @param promise
+         */
         @Override
         public final void bind(final SocketAddress localAddress, final ChannelPromise promise) {
             assertEventLoop();

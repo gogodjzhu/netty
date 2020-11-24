@@ -21,6 +21,7 @@ import io.netty.util.internal.logging.InternalLoggerFactory;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.nio.channels.Channel;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -198,7 +199,7 @@ public class DefaultPromiseTest {
         testPromiseListenerAddWhenComplete(null);
     }
 
-    @Test(timeout = 2000)
+    @Test()
     public void testLateListenerIsOrderedCorrectlySuccess() throws InterruptedException {
         testLateListenerIsOrderedCorrectly(null);
     }
@@ -239,6 +240,37 @@ public class DefaultPromiseTest {
                 executor.shutdownGracefully();
             }
         }
+    }
+
+    @Test
+    public void testRunPromise() throws InterruptedException {
+        EventExecutor executor = new TestEventExecutor();
+        // 通常由channel.newPromise()创建新实例
+        final DefaultPromise<Integer> promise = new DefaultPromise<Integer>(executor);
+        promise.addListener(new GenericFutureListener<Future<? super Integer>>() {
+            @Override
+            public void operationComplete(Future<? super Integer> future) throws Exception {
+                assert future.isSuccess();
+                System.out.println("listener1, promise result:" + future.getNow());
+            }
+        });
+        promise.addListener(new GenericFutureListener<Future<? super Integer>>() {
+            @Override
+            public void operationComplete(Future<? super Integer> future) throws Exception {
+                assert future.isSuccess();
+                System.out.println("listener2, promise result:" + future.getNow());
+            }
+        });
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                promise.setSuccess(1);
+            }
+        });
+        thread.start();
+
+        // 等待线程结束
+        Thread.sleep(200);
     }
 
     private void testStackOverFlowChainedFuturesA(int promiseChainLength, final EventExecutor executor,

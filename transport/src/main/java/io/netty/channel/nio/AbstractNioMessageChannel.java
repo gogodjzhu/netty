@@ -126,13 +126,18 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
         }
     }
 
+    /**
+     * 将Buffer中的数据刷写给对端
+     */
     @Override
     protected void doWrite(ChannelOutboundBuffer in) throws Exception {
         final SelectionKey key = selectionKey();
         final int interestOps = key.interestOps();
 
         for (;;) {
+            // 在for循环中遍历Buffer链表
             Object msg = in.current();
+            // msg为null, 表示链表遍历结束, 从SelectionKey中移除OP_WRITE
             if (msg == null) {
                 // Wrote all messages.
                 if ((interestOps & SelectionKey.OP_WRITE) != 0) {
@@ -140,6 +145,8 @@ public abstract class AbstractNioMessageChannel extends AbstractNioChannel {
                 }
                 break;
             }
+            // msg不为null, 调用doWriteMessage发送.
+            // 但是要注意!!! 子类NioServerSocketChannel必然不会进入此方法(实现为异常)
             try {
                 boolean done = false;
                 for (int i = config().getWriteSpinCount() - 1; i >= 0; i--) {

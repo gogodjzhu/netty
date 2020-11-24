@@ -173,6 +173,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
         for (;;) {
             // buffer的发送(flushed)链表的表头内容, 通过外层for循环遍历链表
             Object msg = in.current();
+            // msg为null, 表示链表遍历结束, 从SelectionKey中移除OP_WRITE
             if (msg == null) {
                 // Wrote all messages.
                 clearOpWrite();
@@ -180,6 +181,7 @@ public abstract class AbstractNioByteChannel extends AbstractNioChannel {
                 return;
             }
 
+            // 根据msg的类型, 调用不同的底层方法执行发送
             if (msg instanceof ByteBuf) {
                 ByteBuf buf = (ByteBuf) msg;
                 int readableBytes = buf.readableBytes();

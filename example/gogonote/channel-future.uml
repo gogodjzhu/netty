@@ -1,0 +1,98 @@
+@startuml
+
+interface java.util.concurrent.Future<V> {
+    + boolean cancel(mayInterruptIfRunning: boolean)
+    + boolean isCancelled()
+    + boolean isDone()
+    + V get()
+    + V get(timeout: long, unit: TimeUnit)
+}
+
+interface Future<V> extends java.util.concurrent.Future{
+    + boolean isSuccess()
+    + boolean isCancellable()
+    + Throwable cause()
+
+    + Future<V> addListener(listener: GenericFutureListener)
+    + Future<V> addListeners(listeners: GenericFutureListener[])
+    + Future<V> removeListener(listener: GenericFutureListener)
+    + Future<V> removeListeners(listeners: GenericFutureListener[])
+
+    + Future<V> sync()
+    + Future<V> syncUninterruptibly()
+    + Future<V> await()
+    + Future<V> awaitUninterruptibly()
+    + Future<V> sync(timeout: long, unit: TimeUnit)
+    + Future<V> syncUninterruptibly(timeout: long, unit: TimeUnit)
+    + Future<V> await(timeout: long, unit: TimeUnit)
+    + Future<V> awaitUninterruptibly(timeout: long, unit: TimeUnit)
+
+    + V getNow() // 立即获取返回. 未完成或者实际返回null的时候, 返回为null, 故需要通过isDone()来判断是否成功
+    + boolean cancel(mayInterruptIfRunning: boolean) // @Override java.util.concurrent.Future
+}
+
+interface ChannelFuture extends Future {
+    + Channel channel() // 返回跟当前future实例相关的Channel
+}
+
+interface Promise extends Future {
+    + Promise<V> setSuccess(result: V)
+    + boolean trySuccess(result: V)
+    + Promise<V> setFailure(cause: Throwable)
+    + boolean tryFailure(cause: Throwable)
+    + boolean setUncancellable()
+}
+note top of Promise
+<b>支持写操作的Future</b>
+setXXX和tryXXX方法的差别在于修改'已经标记为Done的Future'时,
+前者抛出IllegalStateException异常, 后者返回false
+end note
+
+interface ChannelPromise extends ChannelFuture, Promise {
+    + ChannelPromise setSuccess();
+    + boolean trySuccess();
+}
+
+abstract class AbstractFuture implements Future {
+    + V get()
+    + V get(timeout: long, unit: TimeUnit)
+}
+note top of AbstractFuture
+结合await()/getNow()方法实现的不能cancel的Future实现
+但是await()和getNow()方法都留给子类实现
+end note
+
+class DefaultPromise extends AbstractFuture implements Promise {
+    - executor EventExecutor // 用于在promise完成执行回调的处理器
+    - listeners Object //
+    - waiters short // 用于协调线程并发
+    - result Object // 处理结果,仅在this#setValue0方法中更新
+
+    + DefaultPromise(executor: EventExecutor) // 构造函数
+    - boolean setSuccess0(result: V)
+    - boolean setFailure0(cause: Throwable)
+    - boolean setValue0(objResult: Object) // setSuccess0/setFailure0最终回调此方法, 通过CMS更新this#result, 并且notifyAll等待this的线程
+
+    - void notifyListeners() // 此方法会判断当前线程(executor.inEventLoop())来决定在哪个线程执行notifyListenersNow()
+    - void notifyListenersNow() // 最终会回调 GenericFutureListener#operationComplete(future: <Future>)
+}
+note right of DefaultPromise
+<b>业务线程</b>:
+得到DefaultPromise之后, 业务线程可以选择:
+    1. 调用await()阻塞等待Promise完成
+    2. 调用addListener(l:Listener), 异步继续业务操作
+<b>Promise线程</b>:
+在Promise线程处理结束后, 会主动调用setSuccess()/setFailure()写回结果, 并:
+    1. 调用notifyAll()唤醒调用await()正在阻塞等待的业务线程
+    2. 调用notifyListeners()回调所有的Listener#operationComplete(future: <Future>)方法
+end note
+
+class DefaultChannelPromise extends DefaultPromise implements ChannelPromise, FlushCheckpoint {
+    - channel Channel
+    - checkpoint long
+
+    + DefaultChannelPromise(channel: Channel) // 未指定executor, 在executor()方法中会选用channel().eventLoop()作为默认的executor
+    + DefaultChannelPromise(channel: Channel, executor: EventExecutor) // 指定EventExecutor用于执行回调
+}
+
+@enduml
